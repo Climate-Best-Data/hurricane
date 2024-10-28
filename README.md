@@ -17,30 +17,35 @@ This project visualizes hurricane data using `matplotlib` and `seaborn`.
 
    ```bash
    python3 -m venv .venv
+   
 2. **Activate the virtual environment**:
 
     On macOS and Linux:
     ```
     source .venv/bin/activate
-
+    ```
     On Windows:
     ```
     .venv\Scripts\activate
+    ```
 
 3. **Install the required packages**:
 
     With the virtual environment activated, install the necessary packages using pip:
     ```
     pip install matplotlib seaborn
+    ```
 
 ### Running the Script
-    With the virtual environment activated, you can run the hurricane_preview.py script:
 
+    With the virtual environment activated, you can run the hurricane_preview.py script:
     ```
     python hurricane_preview.py
+    ```
 
     Deactivating the Virtual Environment
     When you're done, you can deactivate the virtual environment by running:
     ```
     deactivate
+    ```
 
