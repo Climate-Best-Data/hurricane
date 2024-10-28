@@ -38,15 +38,16 @@ This project visualizes hurricane data using `matplotlib` and `seaborn`.
 
 ### Running the Script
 
-    With the virtual environment activated, you can run the hurricane_preview.py script:
+With the virtual environment activated, you can run the hurricane_preview.py script:
 
-    ```bash
+
     python hurricane_preview.py
-    ```
-    Deactivating the Virtual Environment
-    When you're done, you can deactivate the virtual environment by running:
 
-    ```bash
+### Deactivating the Virtual Environment
+
+When you're done, you can deactivate the virtual environment by running:
+
+
     deactivate
-    ```
+
 
