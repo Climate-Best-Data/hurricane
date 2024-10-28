@@ -43,6 +43,14 @@ With the virtual environment activated, you can run the hurricane_preview.py scr
 
     python hurricane_preview.py
 
+
+### Dataset
+
+This project uses the **[Benchmark Dataset for Automatic Damaged Building Detection from Post-Hurricane Remotely Sensed Imagery]https://drive.google.com/drive/folders/1NvYoKQ8_oxA7oeCN5alwpLiFOC19_OF7?usp=sharing** for training the model.
+
+Youngjun Choe, Valentina Staneva, Tessa Schneider, Andrew Escay, Christopher Haberland, Sean Chen, December 12, 2018, "Benchmark Dataset for Automatic Damaged Building Detection from Post-Hurricane Remotely Sensed Imagery", IEEE Dataport, doi: https://dx.doi.org/10.21227/1s3n-f891.
+
+
 ### Deactivating the Virtual Environment
 
 When you're done, you can deactivate the virtual environment by running:
