@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from PIL import Image
+import tensorflow as tf
 from skimage.io import imread
 from skimage.util import montage
 from tqdm import tqdm
@@ -16,6 +17,10 @@ from keras.applications import resnet50
 from keras import models, layers
 
 import time
+
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 plt.rcParams["figure.figsize"] = (6, 6)
 plt.rcParams["figure.dpi"] = 200
@@ -29,7 +34,7 @@ plt.rcParams['image.cmap'] = 'viridis'
 tqdm.pandas() # hack progressbars into pandas
 montage_rgb = lambda x, **kwargs: np.stack([montage(x[:, :, :, i], **kwargs) for i in range(x.shape[3])], -1)
 
-satellite_dir = Path('../input/satellite-images-of-hurricane-damage/')
+satellite_dir = Path('/Users/elise/Desktop/hurricane/archive')
 image_df = pd.DataFrame({'path': list(satellite_dir.glob('**/*.jp*g'))})
 image_df.sample(3)
 
@@ -94,7 +99,8 @@ fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6))
 ax1.imshow(few_color_image)
 counts, bins = np.histogram(web_image, bins=np.arange(256))
 for i in range(counts.shape[0]):
-    ax2.bar(bins[i], counts[i], color=idx_to_color[i])
+    if i < len(idx_to_color):
+        ax2.bar(bins[i], counts[i], color=idx_to_color[i])
 ax2.set_yscale('log')
 ax2.set_xlabel('Color Id')
 ax2.set_ylabel('Pixel Count')
@@ -152,15 +158,18 @@ image_df.sample(3)
 
 pretrained_model = resnet50.ResNet50(include_top=False, weights='imagenet')
 feature_model = models.Sequential(name='just_features')
-prep_layer = layers.Conv2D(3, 
-                           kernel_size=(1, 1), 
-                           weights=[np.expand_dims(np.expand_dims(np.eye(3), 0), 0), 
-                                    np.array([-103.9, -116.78, -123.68])],
-                           input_shape=(None, None, 3),
-                          name='PreprocessingLayer')
+# Define the preprocessing step using Lambda to subtract the RGB mean values
+prep_layer = layers.Lambda(lambda x: x - tf.constant([103.9, 116.78, 123.68]), name='PreprocessingLayer')
 feature_model.add(prep_layer)
+
+# Load ResNet50 without the top layers and add to the model
+pretrained_model = resnet50.ResNet50(include_top=False, weights='imagenet')
 feature_model.add(pretrained_model)
+
+# Add global average pooling
 feature_model.add(layers.GlobalAveragePooling2D())
+
+# Save and summarize the model
 feature_model.save('feature_model.h5')
 feature_model.summary()
 
@@ -193,4 +202,7 @@ for c_group, c_row in image_df.groupby('damage'):
     ax1.plot(c_row['x'], c_row['y'], '*', label=c_group)
 ax1.legend()
 
-show_xy_images(image_df.groupby('damage').apply(lambda x: x.sample(100)))
+# Re-select grouping columns after apply
+sampled_df = image_df.groupby('damage').apply(lambda x: x.sample(100)).reset_index(drop=True)
+show_xy_images(sampled_df)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
