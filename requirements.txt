@@ -5,4 +5,4 @@ numpy
 Pillow
 scikit-image
 tqdm
-sklearn
+scikit-learn
