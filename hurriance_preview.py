@@ -34,7 +34,7 @@ plt.rcParams['image.cmap'] = 'viridis'
 tqdm.pandas() # hack progressbars into pandas
 montage_rgb = lambda x, **kwargs: np.stack([montage(x[:, :, :, i], **kwargs) for i in range(x.shape[3])], -1)
 
-satellite_dir = Path('/Users/elise/Desktop/hurricane/archive')
+satellite_dir = Path('./lib')
 image_df = pd.DataFrame({'path': list(satellite_dir.glob('**/*.jp*g'))})
 image_df.sample(3)
 
