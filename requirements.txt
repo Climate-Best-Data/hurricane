@@ -6,3 +6,5 @@ Pillow
 scikit-image
 tqdm
 scikit-learn
+keras
+tensorflow
