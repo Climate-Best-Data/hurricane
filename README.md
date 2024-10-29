@@ -33,7 +33,7 @@ This project visualizes hurricane data using `matplotlib` and `seaborn`.
 
     With the virtual environment activated, install the necessary packages using pip:
     ```
-    pip install matplotlib seaborn
+    pip install -r requirements.txt
     ```
 
 ### Running the Script
