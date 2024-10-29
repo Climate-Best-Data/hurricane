@@ -149,6 +149,8 @@ def show_xy_images(in_df, image_zoom=1):
     ax1.update_datalim(in_df[['x', 'y']])
     ax1.autoscale()
     ax1.axis('off')
+    plt.show()
+    
 show_xy_images(image_df.sample(200))
 
 image_df['path'] = image_df['path'].map(str) # saving pathlib objects causes problems
@@ -202,7 +204,9 @@ for c_group, c_row in image_df.groupby('damage'):
     ax1.plot(c_row['x'], c_row['y'], '*', label=c_group)
 ax1.legend()
 
-# Re-select grouping columns after apply
-sampled_df = image_df.groupby('damage', group_keys=False).apply(lambda x: x.sample(100, include_groups=False)).reset_index(drop=True)
+# Add `include_groups=False` to the apply function directly
+sampled_df = image_df.groupby('damage', group_keys=False).apply(lambda x: x.sample(100), include_groups=False).reset_index(drop=True)
+
+# Pass this DataFrame to your show_xy_images function
 show_xy_images(sampled_df)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+
