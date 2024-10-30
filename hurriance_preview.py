@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -10,203 +9,107 @@ import tensorflow as tf
 from skimage.io import imread
 from skimage.util import montage
 from tqdm import tqdm
-
 from sklearn.decomposition import PCA
-
 from keras.applications import resnet50
 from keras import models, layers
-
-import time
-
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
+plt.rcParams.update({"figure.figsize": (7, 7), "figure.dpi": 180, "font.size": 13, 'font.family': 'serif'})
+sns.set_theme(style="darkgrid", rc={'axes.grid': False})
+tqdm.pandas()
 
-plt.rcParams["figure.figsize"] = (6, 6)
-plt.rcParams["figure.dpi"] = 200
-plt.rcParams["font.size"] = 14
-plt.rcParams['font.family'] = ['sans-serif']
-plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
-plt.style.use('ggplot')
-sns.set_style("whitegrid", {'axes.grid': False})
-plt.rcParams['image.cmap'] = 'viridis'
+def create_montage_rgb(images):
+    return np.stack([montage(images[:, :, :, i]) for i in range(images.shape[3])], -1)
 
-tqdm.pandas() # hack progressbars into pandas
-montage_rgb = lambda x, **kwargs: np.stack([montage(x[:, :, :, i], **kwargs) for i in range(x.shape[3])], -1)
-
-satellite_dir = Path('./lib')
-image_df = pd.DataFrame({'path': list(satellite_dir.glob('**/*.jp*g'))})
-image_df.sample(3)
-
-image_df['damage'] = image_df['path'].map(lambda x: x.parent.stem)
-image_df['data_split'] = image_df['path'].map(lambda x: x.parent.parent.stem)
-image_df['location'] = image_df['path'].map(lambda x: x.stem)
-image_df['lat'] = image_df['location'].map(lambda x: float(x.split('_')[0]))
-image_df['lon'] = image_df['location'].map(lambda x: float(x.split('_')[-1]))
-image_df.sample(3)
+src_dir = Path('./lib')
+img_data = pd.DataFrame({'location': list(src_dir.glob('**/*.jp*g'))})
+img_data['label'] = img_data['location'].apply(lambda x: x.parent.stem)
+img_data['split'] = img_data['location'].apply(lambda x: x.parent.parent.stem)
+img_data['coords'] = img_data['location'].apply(lambda x: x.stem)
+img_data['latitude'] = img_data['coords'].apply(lambda x: float(x.split('_')[0]))
+img_data['longitude'] = img_data['coords'].apply(lambda x: float(x.split('_')[-1]))
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-for c_group, c_rows in image_df.groupby(['damage']):
-    ax1.plot(c_rows['lat'], c_rows['lon'], '.', label=c_group, alpha=0.5)
+for label, group in img_data.groupby('label'):
+    ax1.scatter(group['latitude'], group['longitude'], label=label, alpha=0.6)
+ax1.set_title('Data Split by Label')
 ax1.legend()
-ax1.set_title('Data by Damage Type')
-for c_group, c_rows in image_df.groupby(['data_split']):
-    ax2.plot(c_rows['lat'], c_rows['lon'], '.', label=c_group, alpha=0.5)
+
+for group, subset in img_data.groupby('split'):
+    ax2.scatter(subset['latitude'], subset['longitude'], label=group, alpha=0.6)
+ax2.set_title('Data Grouped by Split')
 ax2.legend()
-ax2.set_title('Data by Group')
 
-fig, m_axs = plt.subplots(1, 2, figsize=(20, 10))
-for c_ax, (c_cat, c_rows) in zip(m_axs, image_df.groupby(['damage'])):
-    img_stack = np.stack(c_rows.sample(121)['path'].map(imread), 0)
-    c_ax.imshow(montage_rgb(img_stack))
-    c_ax.set_title(c_cat)
-    c_ax.axis('off')
+fig, axes = plt.subplots(1, 2, figsize=(20, 10))
+for ax, (label, group) in zip(axes, img_data.groupby('label')):
+    image_stack = np.stack(group.sample(100)['location'].apply(imread), 0)
+    ax.imshow(create_montage_rgb(image_stack))
+    ax.axis('off')
+    ax.set_title(label)
 
-fig, m_axs = plt.subplots(2, 2, figsize=(20, 20))
-for c_ax, (c_cat, c_rows) in zip(m_axs.flatten(), image_df.groupby(['data_split'])):
-    img_stack = np.stack(c_rows.sample(121)['path'].map(imread), 0)
-    c_ax.imshow(montage_rgb(img_stack))
-    c_ax.set_title(c_cat)
-    c_ax.axis('off')
+fig, axes = plt.subplots(2, 2, figsize=(18, 18))
+for ax, (split, subset) in zip(axes.flatten(), img_data.groupby('split')):
+    img_stack = np.stack(subset.sample(100)['location'].apply(imread), 0)
+    ax.imshow(create_montage_rgb(img_stack))
+    ax.set_title(split)
+    ax.axis('off')
 
-test_image = Image.open(image_df['path'].iloc[1010]) # normal image
-# convert to 8bit color (animated GIF) and then back
-web_image = test_image.convert('P', palette='WEB', dither=None)
-few_color_image = web_image.convert('RGB')
+last_img = Image.open(img_data['location'].iloc[-1])
+web_palette_img = last_img.convert('P', palette='WEB', dither=None).convert('RGB')
+
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-ax1.imshow(test_image)
-ax2.imshow(few_color_image)
+ax1.imshow(last_img)
+ax2.imshow(web_palette_img)
+ax1.set_title("Original Image")
+ax2.set_title("Reduced Colors")
 
-print('Unique colors before', len(set([tuple(rgb) for rgb in np.array(test_image).reshape((-1, 3))])))
-print('Unique colors after', len(set([tuple(rgb) for rgb in np.array(few_color_image).reshape((-1, 3))])))
+def normalize_color_histogram(img_path):
+    img_raw = Image.open(img_path).convert('P', palette='WEB', dither=None)
+    counts, _ = np.histogram(np.array(img_raw).ravel(), bins=np.arange(256))
+    return counts.astype(float) / np.prod(img_raw.size)
 
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6))
-for c_channel, c_name in enumerate(['red', 'green', 'blue']):
-    ax1.hist(np.array(test_image)[:, :, c_channel].ravel(), 
-             color=c_name[0], 
-             label=c_name, 
-             bins=np.arange(256), 
-             alpha=0.5)
-    ax2.hist(np.array(few_color_image)[:, :, c_channel].ravel(), 
-             color=c_name[0], 
-             label=c_name, 
-             bins=np.arange(256), 
-             alpha=0.5)
-    
-idx_to_color = np.array(web_image.getpalette()).reshape((-1, 3))/255.0
-
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6))
-ax1.imshow(few_color_image)
-counts, bins = np.histogram(web_image, bins=np.arange(256))
-for i in range(counts.shape[0]):
-    if i < len(idx_to_color):
-        ax2.bar(bins[i], counts[i], color=idx_to_color[i])
-ax2.set_yscale('log')
-ax2.set_xlabel('Color Id')
-ax2.set_ylabel('Pixel Count')
-
-def color_count_feature(in_path):
-    raw_image = Image.open(in_path) 
-    web_image = raw_image.convert('P', palette='WEB', dither=None)
-    counts, bins = np.histogram(np.array(web_image).ravel(), bins=np.arange(256))
-    return counts*1.0/np.prod(web_image.size) # normalize output
-
-image_df['color_features'] = image_df['path'].progress_map(color_count_feature)
+img_data['color_data'] = img_data['location'].progress_apply(normalize_color_histogram)
 
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10))
-combined_features = np.stack(image_df['color_features'].values, 0)
-ax1.imshow(combined_features)
-ax1.set_title('Raw Color Counts')
-ax1.set_xlabel('Color')
-ax1.set_ylabel('Frequency')
-ax1.set_aspect(0.01)
-color_wise_average = np.tile(np.mean(combined_features, 0, keepdims=True), (combined_features.shape[0], 1)).clip(1/(128*128), 1)
-ax2.imshow(combined_features/color_wise_average, vmin=0.05, vmax=20)
+color_data = np.stack(img_data['color_data'])
+ax1.imshow(color_data)
+ax1.set_title('Raw Color Count per Image')
+
+norm_avg = np.tile(color_data.mean(axis=0), (color_data.shape[0], 1))
+ax2.imshow(color_data / norm_avg.clip(1e-4), vmin=0.1, vmax=10, cmap='plasma')
 ax2.set_title('Normalized Color Counts')
-ax2.set_xlabel('Color')
-ax2.set_ylabel('Frequency')
-ax2.set_aspect(0.01)
 
-xy_pca = PCA(n_components=2)
-xy_coords = xy_pca.fit_transform(combined_features)
-image_df['x'] = xy_coords[:, 0]
-image_df['y'] = xy_coords[:, 1]
+pca_model = PCA(n_components=2)
+pca_coords = pca_model.fit_transform(color_data)
+img_data['x'] = pca_coords[:, 0]
+img_data['y'] = pca_coords[:, 1]
 
-fig, ax1 = plt.subplots(1,1, figsize=(15, 15))
-for c_group, c_row in image_df.groupby('damage'):
-    ax1.plot(c_row['x'], c_row['y'], '*', label=c_group)
-ax1.legend()
+fig, ax = plt.subplots(figsize=(15, 15))
+for label, group in img_data.groupby('label'):
+    ax.scatter(group['x'], group['y'], label=label)
+ax.legend()
+ax.set_title("PCA Projection by Damage Type")
 
-
-def show_xy_images(in_df, image_zoom=1):
-    fig, ax1 = plt.subplots(1,1, figsize=(10, 10))
-    artists = []
-    for _, c_row in in_df.iterrows():
-        c_img = Image.open(c_row['path']).resize((64, 64))
-        img = OffsetImage(c_img, zoom=image_zoom)
-        ab = AnnotationBbox(img, (c_row['x'], c_row['y']), xycoords='data', frameon=False)
-        artists.append(ax1.add_artist(ab))
-    ax1.update_datalim(in_df[['x', 'y']])
-    ax1.autoscale()
-    ax1.axis('off')
+def display_pca_images(df, img_zoom=1.2):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    for _, row in df.iterrows():
+        img = Image.open(row['location']).resize((60, 60))
+        box_img = OffsetImage(img, zoom=img_zoom)
+        ab = AnnotationBbox(box_img, (row['x'], row['y']), frameon=False)
+        ax.add_artist(ab)
+    ax.autoscale()
+    ax.axis('off')
     plt.show()
-    
-show_xy_images(image_df.sample(200))
 
-image_df['path'] = image_df['path'].map(str) # saving pathlib objects causes problems
-image_df.to_json('color_features.json')
+display_pca_images(img_data.sample(200))
 
-image_df.sample(3)
+img_data.to_json('processed_data.json')
 
-pretrained_model = resnet50.ResNet50(include_top=False, weights='imagenet')
-feature_model = models.Sequential(name='just_features')
-# Define the preprocessing step using Lambda to subtract the RGB mean values
-prep_layer = layers.Lambda(lambda x: x - tf.constant([103.9, 116.78, 123.68]), name='PreprocessingLayer')
-feature_model.add(prep_layer)
+resnet_model = resnet50.ResNet50(include_top=False, weights='imagenet')
+feature_extractor = models.Sequential([layers.Lambda(lambda x: x - tf.constant([103.9, 116.78, 123.68])), resnet_model, layers.GlobalAveragePooling2D()])
+feature_extractor.save('saved_feature_model.h5')
 
-# Load ResNet50 without the top layers and add to the model
-pretrained_model = resnet50.ResNet50(include_top=False, weights='imagenet')
-feature_model.add(pretrained_model)
+img_data['extracted_features'] = img_data['location'].progress_apply(lambda x: feature_extractor.predict(np.expand_dims(imread(x), 0))[0])
 
-# Add global average pooling
-feature_model.add(layers.GlobalAveragePooling2D())
-
-# Save and summarize the model
-feature_model.save('feature_model.h5')
-feature_model.summary()
-
-image_df['resnet_features'] = image_df['path'].progress_map(lambda x: feature_model.predict(np.expand_dims(imread(x), 0))[0])
-
-image_df.to_json('resnet_features.json')
-
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 10))
-combined_features = np.stack(image_df['resnet_features'].values, 0)
-ax1.imshow(combined_features)
-ax1.set_title('Raw Feature Values')
-ax1.set_xlabel('Color')
-ax1.set_ylabel('Frequency')
-ax1.set_aspect(0.01)
-color_wise_average = np.tile(np.mean(combined_features, 0, keepdims=True), (combined_features.shape[0], 1))
-color_wise_std = np.tile(np.std(combined_features, 0, keepdims=True), (combined_features.shape[0], 1)).clip(0.01, 10)
-ax2.imshow((combined_features-color_wise_average)/color_wise_std, vmin=-2, vmax=2, cmap='RdBu')
-ax2.set_title('Normalized Feature Values')
-ax2.set_xlabel('Color')
-ax2.set_ylabel('Frequency')
-ax2.set_aspect(0.01)
-
-xy_pca = PCA(n_components=2)
-xy_coords = xy_pca.fit_transform(combined_features)
-image_df['x'] = xy_coords[:, 0]
-image_df['y'] = xy_coords[:, 1]
-
-fig, ax1 = plt.subplots(1,1, figsize=(15, 15))
-for c_group, c_row in image_df.groupby('damage'):
-    ax1.plot(c_row['x'], c_row['y'], '*', label=c_group)
-ax1.legend()
-
-# Add `include_groups=False` to the apply function directly
-sampled_df = image_df.groupby('damage', group_keys=False).apply(lambda x: x.sample(100), include_groups=False).reset_index(drop=True)
-
-# Pass this DataFrame to your show_xy_images function
-show_xy_images(sampled_df)
-
+img_data.to_json('extracted_features.json')
