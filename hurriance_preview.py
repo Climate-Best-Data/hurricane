@@ -1,6 +1,5 @@
 # Import necessary libraries for data manipulation, image processing, machine learning, and visualization
 import matplotlib.pyplot as plt
-import seaborn as sns
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
 import pandas as pd
@@ -18,12 +17,17 @@ import ssl
 # Configure SSL to avoid issues with secure connections
 ssl._create_default_https_context = ssl._create_unverified_context
 
+# Set global parameters for visualization and progress bars
+plt.rcParams.update({"figure.figsize": (7, 7), "figure.dpi": 200, "font.size": 13, 'font.family': 'Calibri'})
+
 # Enable progress bars for pandas methods
 tqdm.pandas()
+
 
 # Function to create a montage of RGB images for easier visualization
 def create_montage_rgb(images):
     return np.stack([montage(images[:, :, :, i]) for i in range(images.shape[3])], -1)
+
 
 # Define source directory and load image paths into a DataFrame
 src_dir = Path('./lib')
@@ -73,11 +77,13 @@ ax2.imshow(web_palette_img)
 ax1.set_title("Original Image")
 ax2.set_title("Reduced Colors")
 
+
 # Function to normalize color histograms for each image, returning the color count as features
 def normalize_color_histogram(img_path):
     img_raw = Image.open(img_path).convert('P', palette='WEB', dither=None)
     counts, _ = np.histogram(np.array(img_raw).ravel(), bins=np.arange(256))
     return counts.astype(float) / np.prod(img_raw.size)
+
 
 # Apply color normalization function to all images
 img_data['color_data'] = img_data['location'].progress_apply(normalize_color_histogram)
@@ -96,6 +102,7 @@ for label, group in img_data.groupby('label'):
 ax.legend()
 ax.set_title("PCA Projection by Damage Type")
 
+
 # Function to overlay images on the PCA plot, enhancing visual analysis
 def display_pca_images(df, img_zoom=1.2):
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -107,6 +114,7 @@ def display_pca_images(df, img_zoom=1.2):
     ax.autoscale()
     ax.axis('off')
     plt.show()
+
 
 # Display a subset of images on the PCA plot for inspection
 display_pca_images(img_data.sample(200))
